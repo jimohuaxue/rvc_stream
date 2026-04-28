@@ -1,0 +1,57 @@
+# RVC Streaming Server - Using PyTorch Official Image
+# Faster build - PyTorch and CUDA already included
+
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
+
+WORKDIR /app
+
+# Install system dependencies for audio processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Copy dependency files
+COPY requirements-server.txt pyproject.toml ./
+
+# Install RVC-specific dependencies (PyTorch already installed)
+RUN pip install --no-cache-dir \
+    fastapi>=0.100.0 \
+    uvicorn[standard]>=0.23.0 \
+    websockets>=11.0 \
+    numpy>=1.24.0 \
+    pyyaml>=6.0 \
+    fairseq>=0.12.2 \
+    faiss-cpu>=1.7.3 \
+    librosa>=0.10.0 \
+    soundfile>=0.12.1 \
+    scipy>=1.10.0
+
+# Copy application code
+COPY src/ ./src/
+COPY configs/ ./configs/
+COPY pyproject.toml ./
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/assets/weights
+
+# Create non-root user
+RUN useradd -m -u 1000 rvcuser && \
+    chown -R rvcuser:rvcuser /app
+
+USER rvcuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose server port
+EXPOSE 8080
+
+# Default command
+CMD ["python3", "-m", "src.rvc_server", "--host", "0.0.0.0", "--port", "8080"]

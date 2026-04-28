@@ -1,0 +1,13 @@
+name: rvcstream
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip>=24.0
+  - pip:
+    - -r requirements-client.txt
+    - -r requirements-server.txt
+    - -r requirements-admin.txt
+    - -r requirements-dev.txt

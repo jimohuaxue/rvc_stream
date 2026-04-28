@@ -1,0 +1,40 @@
+# Python cache and build outputs
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+rvcstream_venv/
+.venv/
+venv/
+env/
+
+# Local runtime data
+runtime/
+logs/
+models/
+shared/
+*.log
+*.pth
+*.pt
+*.index
+
+# Local env and editor files
+.env
+.env.*
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS noise
+.DS_Store
+Thumbs.db

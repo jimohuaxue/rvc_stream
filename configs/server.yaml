@@ -1,0 +1,26 @@
+models: []
+rvc:
+  I_noise_reduce: true
+  O_noise_reduce: true
+  block_time: 0.3
+  crossfade_length: 0.06
+  extra_time: 3.0
+  f0method: fcpe
+  formant: 0.2
+  index_rate: 0.8
+  n_cpu: 8
+  pitch: 5
+  rms_mix_rate: 0.3
+  sr_type: sr_model
+  threshold: -30.0
+server:
+  host: 0.0.0.0
+  max_queue_size: 100
+  model_cache_size: 3
+  port: 9000
+streaming:
+  channels: 1
+  chunk_size: 512
+  dtype: float32
+  latency_target_ms: 100
+  sample_rate: 16000

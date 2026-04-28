@@ -1,0 +1,43 @@
+# RVC Streaming Server - Using host's existing Python environment
+# This avoids large downloads by mounting the host's venv
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install only minimal system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/assets/weights
+
+# The Python environment from host will be mounted at /opt/venv
+# We'll create a script that uses that environment
+ENV PATH="/opt/venv/bin:$PATH"
+ENV VIRTUAL_ENV="/opt/venv"
+ENV PYTHONPATH="/app:$PYTHONPATH"
+
+# Copy application code
+COPY src/ ./src/
+COPY configs/ ./configs/
+COPY pyproject.toml ./
+
+# Create non-root user
+RUN useradd -m -u 1000 rvcuser && \
+    chown -R rvcuser:rvcuser /app
+
+USER rvcuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose server port
+EXPOSE 8080
+
+# Default command - uses Python from mounted venv
+CMD ["/opt/venv/bin/python", "-m", "src.rvc_server", "--host", "0.0.0.0", "--port", "8080"]

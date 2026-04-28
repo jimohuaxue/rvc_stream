@@ -1,0 +1,18 @@
+# RVC inference stack — install only on inference machines.
+#
+# fairseq note: PyPI release is broken on Python 3.11+ (omegaconf metadata conflict).
+# Install with --no-build-isolation to bypass the issue:
+#
+#   pip install fairseq --no-build-isolation
+#
+# Or use the community-patched fork that ships fixed metadata:
+#
+#   pip install git+https://github.com/One-sixth/fairseq.git
+#
+fairseq --no-build-isolation ; python_version >= "3.11"
+fairseq>=0.12.2 ; python_version < "3.11"
+
+# faiss: use faiss-gpu on CUDA machines for ~10x faster index search.
+#   GPU:  pip install faiss-gpu-cu12
+#   CPU:  pip install faiss-cpu
+faiss-cpu>=1.9.0

@@ -1,0 +1,3 @@
+# Client runtime dependencies.
+-r requirements.txt
+sounddevice>=0.4.5

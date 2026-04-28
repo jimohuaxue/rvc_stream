@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RVC Stream 管理面板</title>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+:root {
+  --accent: #6c63ff;
+  --accent-hover: #574fd6;
+  --accent-light: #ede9ff;
+  --danger: #e53e3e;
+  --danger-hover: #c53030;
+  --success: #38a169;
+  --bg: #f0f2f8;
+  --card: #fff;
+  --border: #e2e8f0;
+  --text: #2d3748;
+  --muted: #718096;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,.08);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* ── Layout ─────────────────────────────────── */
+.topbar { background:var(--card); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; box-shadow:var(--shadow); }
+.topbar h1 { font-size:20px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; }
+.badge { display:inline-flex; align-items:center; gap:5px; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge.online { background:#c6f6d5; color:#276749; }
+.badge.offline { background:#fed7d7; color:#9b2c2c; }
+.dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+
+.page { max-width:1440px; margin:0 auto; padding:24px; display:flex; flex-direction:column; gap:20px; }
+
+/* ── Stats row ───────────────────────────────── */
+.stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; }
+.stat-card { background:var(--card); border-radius:var(--radius); padding:18px 16px; box-shadow:var(--shadow); text-align:center; }
+.stat-val { font-size:28px; font-weight:700; color:var(--accent); }
+.stat-lbl { font-size:12px; color:var(--muted); margin-top:4px; }
+
+/* ── Main grid ───────────────────────────────── */
+.main-grid { display:grid; grid-template-columns:1fr 340px; gap:20px; align-items:start; }
+
+/* ── Cards ───────────────────────────────────── */
+.card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px 24px; }
+.card + .card { margin-top:20px; }
+.card-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:18px; padding-bottom:10px; border-bottom:2px solid var(--accent-light); display:flex; align-items:center; gap:7px; }
+
+/* ── Form controls ───────────────────────────── */
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 20px; }
+.form-group { display:flex; flex-direction:column; gap:5px; }
+.form-group.full { grid-column:1/-1; }
+label { font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+.val-tag { font-size:12px; color:var(--accent); font-weight:700; margin-left:auto; }
+.label-row { display:flex; align-items:center; }
+
+input[type=range] { width:100%; accent-color:var(--accent); cursor:pointer; height:4px; }
+select, input[type=text], input[type=number] {
+  width:100%; padding:8px 11px; border:1.5px solid var(--border); border-radius:8px;
+  font-size:13px; color:var(--text); background:var(--card); transition:border-color .15s;
+}
+select:focus, input[type=text]:focus, input[type=number]:focus { outline:none; border-color:var(--accent); }
+
+.radio-group { display:flex; gap:6px; flex-wrap:wrap; }
+.radio-group label { display:flex; align-items:center; gap:4px; padding:5px 11px; border:1.5px solid var(--border); border-radius:7px; cursor:pointer; font-size:12px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text); transition:all .15s; white-space:nowrap; }
+.radio-group input[type=radio] { display:none; }
+.radio-group input[type=radio]:checked + span { color:var(--accent); font-weight:700; }
+.radio-group label:has(input:checked) { border-color:var(--accent); background:var(--accent-light); color:var(--accent); }
+
+.check-row { display:flex; gap:16px; flex-wrap:wrap; }
+.check-label { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:500; color:var(--text); cursor:pointer; text-transform:none; letter-spacing:0; }
+.check-label input[type=checkbox] { accent-color:var(--accent); width:15px; height:15px; cursor:pointer; }
+
+/* ── Buttons ─────────────────────────────────── */
+btn, .btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:var(--accent-hover); }
+.btn-secondary { background:var(--border); color:var(--text); }
+.btn-secondary:hover { background:#cbd5e0; }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-danger:hover { background:var(--danger-hover); }
+.btn-sm { padding:5px 11px; font-size:12px; }
+.btn-row { display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
+
+/* ── Upload zone ─────────────────────────────── */
+.upload-zone { border:2px dashed var(--border); border-radius:10px; padding:28px 16px; text-align:center; cursor:pointer; transition:all .2s; position:relative; }
+.upload-zone:hover, .upload-zone.drag { border-color:var(--accent); background:var(--accent-light); }
+.upload-zone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.upload-icon { font-size:32px; margin-bottom:8px; }
+.upload-hint { font-size:13px; color:var(--muted); }
+.upload-hint strong { color:var(--accent); }
+
+.progress-wrap { margin-top:12px; display:none; }
+.progress-wrap.show { display:block; }
+.progress-bar-bg { background:var(--border); border-radius:6px; height:8px; overflow:hidden; }
+.progress-bar-fill { height:100%; background:var(--accent); border-radius:6px; transition:width .2s; }
+.progress-text { font-size:12px; color:var(--muted); margin-top:5px; text-align:center; }
+
+/* ── Model list panel ────────────────────────── */
+.model-panel { border:1.5px solid var(--border); border-radius:10px; overflow:hidden; }
+.model-panel-header { background:#f7f9fc; padding:10px 14px; font-size:13px; font-weight:600; color:var(--muted); border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.model-list { max-height:280px; overflow-y:auto; }
+.model-list::-webkit-scrollbar { width:5px; }
+.model-list::-webkit-scrollbar-track { background:transparent; }
+.model-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+.model-item { display:flex; align-items:center; justify-content:space-between; padding:9px 14px; border-bottom:1px solid var(--border); gap:8px; transition:background .1s; }
+.model-item:last-child { border-bottom:none; }
+.model-item:hover { background:#f7f9fc; }
+.model-item.active { background:var(--accent-light); }
+.model-name { font-size:13px; color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.model-size { font-size:11px; color:var(--muted); white-space:nowrap; }
+.model-actions { display:flex; gap:5px; flex-shrink:0; }
+.model-empty { padding:24px; text-align:center; color:var(--muted); font-size:13px; }
+
+/* ── Log viewer ──────────────────────────────── */
+.log-viewer { background:#1a202c; color:#e2e8f0; padding:14px; border-radius:8px; font-family:'JetBrains Mono','Fira Code','Courier New',monospace; font-size:12px; height:320px; overflow-y:auto; line-height:1.6; }
+.log-viewer::-webkit-scrollbar { width:5px; }
+.log-viewer::-webkit-scrollbar-thumb { background:#4a5568; border-radius:3px; }
+.log-entry { padding:2px 0; }
+.log-info .log-msg { color:#68d391; }
+.log-warning .log-msg { color:#fbd38d; }
+.log-error .log-msg { color:#fc8181; }
+.log-ts { color:#4a5568; margin-right:6px; }
+.log-lv { font-weight:700; margin-right:6px; min-width:54px; display:inline-block; }
+.filter-row { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.filter-row select, .filter-row input { flex:0 0 auto; }
+.filter-row input { flex:1; min-width:120px; }
+
+/* ── Bottom grid ─────────────────────────────── */
+.bottom-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+
+/* ── Notification toast ──────────────────────── */
+.toast { position:fixed; bottom:24px; right:24px; padding:12px 20px; border-radius:10px; font-size:13px; font-weight:600; color:#fff; box-shadow:0 4px 16px rgba(0,0,0,.2); z-index:999; opacity:0; transform:translateY(8px); transition:all .25s; pointer-events:none; }
+.toast.show { opacity:1; transform:translateY(0); }
+.toast.ok { background:var(--success); }
+.toast.err { background:var(--danger); }
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width:900px) {
+  .main-grid { grid-template-columns:1fr; }
+  .bottom-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body x-data="app()" x-init="init()">
+
+<!-- Toast -->
+<div class="toast" :class="[toast.show ? 'show':'', toast.type]" x-text="toast.msg"></div>
+
+<!-- Topbar -->
+<div class="topbar">
+  <h1>🎛 RVC Stream</h1>
+  <div class="badge" :class="online ? 'online' : 'offline'">
+    <span class="dot"></span>
+    <span x-text="online ? '在线' : '离线'"></span>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" x-text="stats.active_connections"></div><div class="stat-lbl">活跃连接</div></div>
+    <div class="stat-card"><div class="stat-val" x-text="stats.models_loaded"></div><div class="stat-lbl">已加载模型</div></div>
+    <div class="stat-card"><div class="stat-val" x-text="stats.cpu_percent.toFixed(1)+'%'"></div><div class="stat-lbl">CPU</div></div>
+    <div class="stat-card"><div class="stat-val" x-text="stats.memory_percent.toFixed(1)+'%'"></div><div class="stat-lbl">内存</div></div>
+    <div class="stat-card"><div class="stat-val" x-text="stats.uptime_formatted"></div><div class="stat-lbl">运行时长</div></div>
+  </div>
+
+  <!-- Main two-column -->
+  <div class="main-grid">
+
+    <!-- ── Left column ── -->
+    <div>
+
+      <!-- RVC 推理参数 -->
+      <div class="card">
+        <div class="card-title">⚡ RVC 推理参数</div>
+        <div class="form-grid">
+
+          <!-- 音调 -->
+          <div class="form-group">
+            <div class="label-row"><label>音调偏移（半音）</label><span class="val-tag" x-text="rvc.pitch"></span></div>
+            <input type="range" x-model.number="rvc.pitch" min="-24" max="24" step="1">
+          </div>
+
+          <!-- 音色 -->
+          <div class="form-group">
+            <div class="label-row"><label>声线粗细 / Formant</label><span class="val-tag" x-text="rvc.formant.toFixed(2)"></span></div>
+            <input type="range" x-model.number="rvc.formant" min="-1" max="1" step="0.01">
+          </div>
+
+          <!-- 索引使用率 -->
+          <div class="form-group">
+            <div class="label-row"><label>索引使用率</label><span class="val-tag" x-text="rvc.index_rate.toFixed(2)"></span></div>
+            <input type="range" x-model.number="rvc.index_rate" min="0" max="1" step="0.01">
+          </div>
+
+          <!-- 响度混合 -->
+          <div class="form-group">
+            <div class="label-row"><label>响度混合率</label><span class="val-tag" x-text="rvc.rms_mix_rate.toFixed(2)"></span></div>
+            <input type="range" x-model.number="rvc.rms_mix_rate" min="0" max="1" step="0.01">
+          </div>
+
+          <!-- 响应阈值 -->
+          <div class="form-group">
+            <div class="label-row"><label>响应阈值（dBFS）</label><span class="val-tag" x-text="rvc.threshold.toFixed(0)+' dB'"></span></div>
+            <input type="range" x-model.number="rvc.threshold" min="-100" max="0" step="1">
+          </div>
+
+          <!-- 块时长 -->
+          <div class="form-group">
+            <div class="label-row"><label>处理块时长（秒）</label><span class="val-tag" x-text="rvc.block_time.toFixed(2)+'s'"></span></div>
+            <input type="range" x-model.number="rvc.block_time" min="0.05" max="3.0" step="0.01">
+          </div>
+
+          <!-- 交叉淡化 -->
+          <div class="form-group">
+            <div class="label-row"><label>交叉淡化时长（秒）</label><span class="val-tag" x-text="rvc.crossfade_length.toFixed(2)+'s'"></span></div>
+            <input type="range" x-model.number="rvc.crossfade_length" min="0.01" max="0.5" step="0.01">
+          </div>
+
+          <!-- 额外上下文 -->
+          <div class="form-group">
+            <div class="label-row"><label>额外上下文时长（秒）</label><span class="val-tag" x-text="rvc.extra_time.toFixed(1)+'s'"></span></div>
+            <input type="range" x-model.number="rvc.extra_time" min="0.5" max="10.0" step="0.1">
+          </div>
+
+          <!-- n_cpu（仅 Harvest 用） -->
+          <div class="form-group">
+            <div class="label-row"><label>Harvest CPU 线程数</label><span class="val-tag" x-text="rvc.n_cpu"></span></div>
+            <input type="range" x-model.number="rvc.n_cpu" min="1" max="16" step="1">
+          </div>
+
+          <!-- F0 算法 -->
+          <div class="form-group full">
+            <label>基频提取算法（F0 Method）</label>
+            <div class="radio-group">
+              <template x-for="m in ['pm','harvest','crepe','rmvpe','fcpe']" :key="m">
+                <label>
+                  <input type="radio" :value="m" x-model="rvc.f0method">
+                  <span x-text="m.toUpperCase()"></span>
+                </label>
+              </template>
+            </div>
+          </div>
+
+          <!-- 采样率来源 -->
+          <div class="form-group">
+            <label>采样率来源</label>
+            <div class="radio-group">
+              <label><input type="radio" value="sr_model" x-model="rvc.sr_type"><span>模型采样率</span></label>
+              <label><input type="radio" value="sr_device" x-model="rvc.sr_type"><span>设备采样率</span></label>
+            </div>
+          </div>
+
+          <!-- 降噪 -->
+          <div class="form-group">
+            <label>降噪</label>
+            <div class="check-row">
+              <label class="check-label"><input type="checkbox" x-model="rvc.I_noise_reduce">输入降噪</label>
+              <label class="check-label"><input type="checkbox" x-model="rvc.O_noise_reduce">输出降噪</label>
+            </div>
+          </div>
+
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" @click="saveRvc()">💾 保存推理参数</button>
+          <button class="btn btn-secondary" @click="resetRvc()">↺ 重置</button>
+        </div>
+      </div>
+
+      <!-- 流配置 -->
+      <div class="card">
+        <div class="card-title">📡 流配置</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>采样率（Hz）</label>
+            <select x-model.number="cfg.streaming.sample_rate">
+              <option value="16000">16000</option>
+              <option value="22050">22050</option>
+              <option value="44100">44100</option>
+              <option value="48000">48000</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>块大小（样本数）</label>
+            <select x-model.number="cfg.streaming.chunk_size">
+              <option value="128">128</option>
+              <option value="256">256</option>
+              <option value="512">512</option>
+              <option value="1024">1024</option>
+              <option value="2048">2048</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <div class="label-row"><label>目标延迟（ms）</label><span class="val-tag" x-text="cfg.streaming.latency_target_ms+' ms'"></span></div>
+            <input type="range" x-model.number="cfg.streaming.latency_target_ms" min="10" max="500" step="5">
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" @click="saveStreaming()">💾 保存流配置</button>
+          <button class="btn btn-secondary" @click="resetCfg()">↺ 重置</button>
+        </div>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- ── Right column ── -->
+    <div>
+
+      <!-- 上传模型 -->
+      <div class="card">
+        <div class="card-title">📤 上传模型</div>
+
+        <div class="upload-zone" :class="dragging ? 'drag' : ''"
+          @dragover.prevent="dragging=true"
+          @dragleave="dragging=false"
+          @drop.prevent="onDrop($event)">
+          <input type="file" accept=".pth" @change="onFileSelect($event)">
+          <div class="upload-icon">🗂</div>
+          <div class="upload-hint">拖放 <strong>.pth</strong> 文件到此处<br>或点击选择文件</div>
+        </div>
+
+        <div class="progress-wrap" :class="uploading ? 'show' : ''">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" :style="'width:'+uploadPct+'%'"></div></div>
+          <div class="progress-text" x-text="uploadStatus"></div>
+        </div>
+
+      </div>
+
+      <!-- 已上传模型 小窗 -->
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">
+          📦 已上传模型
+          <button class="btn btn-secondary btn-sm" style="margin-left:auto" @click="loadUploaded()">↺ 刷新</button>
+        </div>
+
+        <div class="model-panel">
+          <div class="model-panel-header">
+            <span x-text="uploaded.length + ' 个文件'"></span>
+            <span style="font-size:11px;font-weight:400">选用 / 删除</span>
+          </div>
+          <div class="model-list">
+            <template x-if="uploaded.length === 0">
+              <div class="model-empty">暂无上传的模型</div>
+            </template>
+            <template x-for="m in uploaded" :key="m.name">
+              <div class="model-item" :class="selectedModel === m.path ? 'active' : ''">
+                <div>
+                  <div class="model-name" :title="m.name" x-text="m.stem"></div>
+                  <div class="model-size" x-text="formatSize(m.size)"></div>
+                </div>
+                <div class="model-actions">
+                  <button class="btn btn-secondary btn-sm" @click="selectModel(m)" title="选用此模型">✓</button>
+                  <button class="btn btn-danger btn-sm" @click="deleteModel(m)" title="删除">✕</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 已选模型加载 -->
+        <template x-if="selectedModel">
+          <div style="margin-top:14px; background:var(--accent-light); border-radius:8px; padding:12px 14px;">
+            <div style="font-size:12px; font-weight:600; color:var(--accent); margin-bottom:6px;">已选：<span x-text="selectedModelName"></span></div>
+            <div class="form-group" style="margin-bottom:8px;">
+              <label>索引文件路径（可选）</label>
+              <input type="text" x-model="selectedIndex" placeholder=".index 路径">
+            </div>
+            <button class="btn btn-primary" style="width:100%" @click="loadModel()">📂 加载到服务器</button>
+          </div>
+        </template>
+
+      </div>
+
+    </div><!-- /right -->
+
+  </div><!-- /main-grid -->
+
+  <!-- Bottom: Logs + Connections -->
+  <div class="bottom-grid">
+
+    <!-- Logs -->
+    <div class="card">
+      <div class="card-title">📋 实时日志
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" @click="connectWS()" x-text="wsOk ? '已连接 ●' : '连接日志'"></button>
+      </div>
+      <div class="filter-row">
+        <select x-model="logFilter" style="width:100px">
+          <option>ALL</option><option>INFO</option><option>WARNING</option><option>ERROR</option>
+        </select>
+        <input type="text" x-model="logSearch" placeholder="搜索...">
+        <button class="btn btn-secondary btn-sm" @click="logs=[]">清空</button>
+      </div>
+      <div class="log-viewer" x-ref="logBox">
+        <template x-for="(l,i) in filteredLogs" :key="i">
+          <div class="log-entry" :class="'log-'+l.level.toLowerCase()">
+            <span class="log-ts" x-text="l.timestamp"></span>
+            <span class="log-lv" x-text="l.level"></span>
+            <span class="log-msg" x-text="l.message"></span>
+          </div>
+        </template>
+        <div x-show="logs.length===0" style="color:#4a5568;padding:8px">暂无日志</div>
+      </div>
+    </div>
+
+    <!-- Connections -->
+    <div class="card">
+      <div class="card-title">🔗 连接监控</div>
+      <div class="model-list" style="max-height:380px">
+        <template x-if="connections.length===0">
+          <div class="model-empty">暂无活跃连接</div>
+        </template>
+        <template x-for="(c,i) in connections" :key="i">
+          <div class="model-item">
+            <div>
+              <div class="model-name" x-text="'连接 #'+c.id.substring(0,8)"></div>
+              <div class="model-size" x-text="'模型: '+(c.model||'无')+' · '+c.sample_rate+' Hz · chunk '+c.chunk_size"></div>
+            </div>
+            <span class="badge online">活跃</span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- /page -->
+
+<script>
+function app() {
+  return {
+    online: false,
+    wsOk: false,
+    ws: null,
+    dragging: false,
+    uploading: false,
+    uploadPct: 0,
+    uploadStatus: '',
+
+    stats: { active_connections:0, models_loaded:0, cpu_percent:0, memory_percent:0, uptime_formatted:'--', log_connections:0 },
+
+    cfg: { streaming: { sample_rate:16000, chunk_size:512, latency_target_ms:100 } },
+
+    rvc: {
+      pitch: 0, formant: 0.0, index_rate: 0.0, rms_mix_rate: 0.0,
+      f0method: 'rmvpe', block_time: 0.25, crossfade_length: 0.05,
+      extra_time: 2.5, n_cpu: 4, I_noise_reduce: false, O_noise_reduce: false,
+      threshold: -60.0, sr_type: 'sr_model'
+    },
+
+    uploaded: [],
+    selectedModel: '',
+    selectedModelName: '',
+    selectedIndex: '',
+    connections: [],
+    logs: [],
+    logFilter: 'ALL',
+    logSearch: '',
+
+    toast: { show: false, msg: '', type: 'ok' },
+    _toastTimer: null,
+
+    /* ── init ── */
+    async init() {
+      await Promise.all([this.loadConfig(), this.loadStats(), this.loadUploaded(), this.loadConnections()]);
+      this.connectWS();
+      setInterval(() => { this.loadStats(); this.loadConnections(); }, 5000);
+    },
+
+    /* ── notify ── */
+    notify(msg, type='ok') {
+      clearTimeout(this._toastTimer);
+      this.toast = { show: true, msg, type };
+      this._toastTimer = setTimeout(() => this.toast.show = false, 3000);
+    },
+
+    /* ── API helpers ── */
+    async api(url, opts={}) {
+      const r = await fetch(url, opts);
+      if (!r.ok) { const e = await r.json().catch(()=>({detail:r.statusText})); throw new Error(e.detail||r.statusText); }
+      return r.json();
+    },
+
+    /* ── Config ── */
+    async loadConfig() {
+      try {
+        const d = await this.api('/admin/api/config');
+        if (d.status === 'success') { this.cfg = d.config; this.online = true; }
+        const rv = await this.api('/admin/api/config/rvc');
+        if (rv.status === 'success') this.rvc = rv.rvc;
+      } catch { this.online = false; }
+    },
+
+    async saveStreaming() {
+      try {
+        await this.api('/admin/api/config/streaming', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(this.cfg.streaming)
+        });
+        this.notify('流配置已保存');
+      } catch(e) { this.notify('保存失败: '+e.message, 'err'); }
+    },
+
+    async saveRvc() {
+      try {
+        await this.api('/admin/api/config/rvc', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(this.rvc)
+        });
+        this.notify('推理参数已保存');
+      } catch(e) { this.notify('保存失败: '+e.message, 'err'); }
+    },
+
+    async resetCfg() {
+      try {
+        const d = await this.api('/admin/api/config/reset', {method:'POST'});
+        if (d.status === 'success') { this.cfg = d.config; this.notify('流配置已重置'); }
+      } catch(e) { this.notify('重置失败: '+e.message, 'err'); }
+    },
+
+    resetRvc() {
+      this.rvc = { pitch:0, formant:0.0, index_rate:0.0, rms_mix_rate:0.0,
+        f0method:'rmvpe', block_time:0.25, crossfade_length:0.05,
+        extra_time:2.5, n_cpu:4, I_noise_reduce:false, O_noise_reduce:false,
+        threshold:-60.0, sr_type:'sr_model' };
+      this.notify('已恢复默认推理参数');
+    },
+
+    /* ── Stats ── */
+    async loadStats() {
+      try {
+        const d = await this.api('/admin/api/stats');
+        if (d.status === 'success') { this.stats = d.stats; this.online = true; }
+      } catch { this.online = false; }
+    },
+
+    /* ── Connections ── */
+    async loadConnections() {
+      try {
+        const d = await this.api('/admin/api/connections');
+        if (d.status === 'success') this.connections = d.connections;
+      } catch {}
+    },
+
+    /* ── Upload ── */
+    onFileSelect(e) { const f = e.target.files[0]; if (f) this.uploadFile(f); },
+    onDrop(e) { this.dragging = false; const f = e.dataTransfer.files[0]; if (f) this.uploadFile(f); },
+
+    uploadFile(file) {
+      if (!file.name.endsWith('.pth')) { this.notify('只接受 .pth 文件', 'err'); return; }
+      this.uploading = true;
+      this.uploadPct = 0;
+      this.uploadStatus = '准备上传…';
+
+      const xhr = new XMLHttpRequest();
+      const fd = new FormData();
+      fd.append('file', file);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          this.uploadPct = Math.round(e.loaded / e.total * 100);
+          this.uploadStatus = `${this.uploadPct}%  (${this.formatSize(e.loaded)} / ${this.formatSize(e.total)})`;
+        }
+      };
+
+      xhr.onload = () => {
+        this.uploading = false;
+        if (xhr.status === 200) {
+          this.notify('上传成功：' + file.name);
+          this.loadUploaded();
+        } else {
+          const err = JSON.parse(xhr.responseText||'{}');
+          this.notify('上传失败：' + (err.detail || xhr.statusText), 'err');
+        }
+      };
+
+      xhr.onerror = () => { this.uploading = false; this.notify('网络错误', 'err'); };
+
+      xhr.open('POST', '/admin/api/models/upload');
+      xhr.send(fd);
+    },
+
+    /* ── Uploaded models panel ── */
+    async loadUploaded() {
+      try {
+        const d = await this.api('/admin/api/models/uploaded');
+        if (d.status === 'success') this.uploaded = d.models;
+      } catch {}
+    },
+
+    selectModel(m) {
+      this.selectedModel = m.path;
+      this.selectedModelName = m.stem;
+    },
+
+    async deleteModel(m) {
+      if (!confirm(`删除 "${m.name}"？`)) return;
+      try {
+        await this.api(`/admin/api/models/uploaded/${encodeURIComponent(m.name)}`, {method:'DELETE'});
+        if (this.selectedModel === m.path) { this.selectedModel = ''; this.selectedModelName = ''; }
+        await this.loadUploaded();
+        this.notify('已删除 ' + m.name);
+      } catch(e) { this.notify('删除失败: '+e.message, 'err'); }
+    },
+
+    async loadModel() {
+      if (!this.selectedModel) return;
+      try {
+        const d = await this.api('/admin/api/models/load', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ pth_path: this.selectedModel, index_path: this.selectedIndex, index_rate: this.rvc.index_rate })
+        });
+        if (d.status === 'success') { this.notify('模型已加载：' + d.model_name); await this.loadStats(); }
+      } catch(e) { this.notify('加载失败: '+e.message, 'err'); }
+    },
+
+    /* ── WebSocket logs ── */
+    connectWS() {
+      if (this.ws) { try { this.ws.close(); } catch {} }
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      this.ws = new WebSocket(`${proto}//${location.host}/admin/ws/logs`);
+      this.ws.onopen = () => { this.wsOk = true; };
+      this.ws.onmessage = (e) => {
+        const log = JSON.parse(e.data);
+        this.logs.unshift(log);
+        if (this.logs.length > 200) this.logs.pop();
+      };
+      this.ws.onclose = () => { this.wsOk = false; };
+      this.ws.onerror = () => { this.wsOk = false; };
+    },
+
+    get filteredLogs() {
+      return this.logs.filter(l =>
+        (this.logFilter === 'ALL' || l.level === this.logFilter) &&
+        (!this.logSearch || l.message.toLowerCase().includes(this.logSearch.toLowerCase()))
+      );
+    },
+
+    /* ── Helpers ── */
+    formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+      return (bytes/1024/1024).toFixed(1) + ' MB';
+    }
+  };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+# RVC Stream - Docker Compose Configuration with Host Venv
+# Uses host's Python environment to avoid large downloads
+
+version: "3.8"
+
+services:
+  # ========================================
+  # RVC Server - Uses host's PyTorch environment
+  # ========================================
+  rvc-server:
+    image: rvc-stream-server:latest
+    container_name: rvc-server-production
+    
+    ports:
+      - "${RVC_SERVER_PORT:-8080}:8080"
+    
+    volumes:
+      # Mount host's Python venv with PyTorch
+      - ${RVC_HOST_VENV:-./rvcstream_venv}:/opt/venv:ro
+      # Model files
+      - ${RVC_MODELS_DIR:-./runtime/models}:/app/assets/weights:ro
+      # Logs
+      - ${RVC_LOGS_DIR:-./runtime/logs}:/app/logs
+      # Application code (for development)
+      - ${RVC_SOURCE_DIR:-./src}:/app/src:ro
+      - ${RVC_CONFIG_DIR:-./configs}:/app/configs:ro
+    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin
+      - VIRTUAL_ENV=/opt/venv
+      - PYTHONPATH=/app
+      - CUDA_VISIBLE_DEVICES=0
+      - LOG_LEVEL=INFO
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ========================================
+  # RVC Client - Lightweight streaming client
+  # ========================================
+  rvc-client:
+    image: rvc-stream-client:latest
+    container_name: rvc-client-production
+    
+    volumes:
+      # Mount host's Python venv with dependencies
+      - ${RVC_HOST_VENV:-./rvcstream_venv}:/opt/venv:ro
+      # Shared directory
+      - ${RVC_SHARED_DIR:-./runtime/shared}:/app/shared:ro
+      # Application code (for development)
+      - ${RVC_SOURCE_DIR:-./src}:/app/src:ro
+    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PATH=/opt/venv/bin:/usr/local/bin:/usr/bin:/bin
+      - VIRTUAL_ENV=/opt/venv
+      - RVC_SERVER_URL=ws://rvc-server:8080/rvc
+    
+    depends_on:
+      rvc-server:
+        condition: service_healthy
+    
+    restart: "no"  # Client runs once then exits
+
+networks:
+  default:
+    name: rvc-network

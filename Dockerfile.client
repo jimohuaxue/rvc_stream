@@ -1,0 +1,49 @@
+# RVC Streaming Client - Minimal Docker Image
+# Lightweight image for client-side (no GPU required)
+
+# ============================================
+# Single-stage build - Minimal dependencies
+# ============================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TZ=Asia/Shanghai
+
+# Install system dependencies for audio
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libasound2-dev \
+    portaudio19-dev \
+    libportaudio2 \
+    libportaudiocpp0 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv for faster package management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+
+# Copy dependency files
+COPY requirements-client.txt pyproject.toml ./
+
+# Install Python dependencies with uv
+RUN uv pip install --system --no-cache-dir \
+    numpy>=1.24.0 \
+    pyyaml>=6.0 \
+    websockets>=11.0 \
+    sounddevice>=0.4.5
+
+# Copy application code
+COPY src/ ./src/
+COPY pyproject.toml ./
+
+# Create non-root user
+RUN useradd -m -u 1000 rvcclient && \
+    chown -R rvcclient:rvcclient /app
+
+USER rvcclient
+
+# Default command shows help
+CMD ["python3", "-m", "src.rvc_client", "--help"]

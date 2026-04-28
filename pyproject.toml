@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rvc-stream"
+version = "0.1.0"
+description = "WebSocket-based real-time voice conversion streaming"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "RVC Project"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "numpy>=2.0.0",
+    "pyyaml>=6.0",
+    "websockets>=13.0",
+]
+
+[project.optional-dependencies]
+client = [
+    "sounddevice>=0.4.5",
+]
+server = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "soundfile>=0.12.1",
+    "librosa>=0.10.2",
+]
+admin = [
+    "psutil>=5.9.0",
+    "pydantic>=2.9.0",
+    "python-multipart>=0.0.12",
+    "aiofiles>=24.1.0",
+]
+rvc = [
+    # fairseq: see requirements-rvc.txt for Python 3.11+ install notes
+    "faiss-cpu>=1.9.0",
+]
+full = [
+    "sounddevice>=0.4.5",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "soundfile>=0.12.1",
+    "librosa>=0.10.2",
+    "psutil>=5.9.0",
+    "pydantic>=2.9.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[project.scripts]
+rvc-server = "src.rvc_server:main"
+rvc-client = "src.rvc_client:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = "test_*"
+asyncio_mode = "auto"

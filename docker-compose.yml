@@ -1,0 +1,92 @@
+# RVC Stream - Docker Compose Configuration
+# Multi-container setup for streaming voice conversion
+
+version: "3.8"
+
+services:
+  # ========================================
+  # RVC Server - GPU-enabled inference
+  # ========================================
+  rvc-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    image: rvc-stream-server:latest
+    container_name: rvc-server
+    
+    # GPU support (requires nvidia-container-toolkit)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    
+    ports:
+      - "8080:8080"
+    
+    volumes:
+      # Model files (read-only)
+      - ${RVC_MODELS_DIR:-./runtime/models}:/app/assets/weights:ro
+      # Logs
+      - ${RVC_LOGS_DIR:-./runtime/logs}:/app/logs
+      # Configs
+      - ./configs:/app/configs:ro
+    
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CUDA_VISIBLE_DEVICES=0
+      - LOG_LEVEL=INFO
+    
+    networks:
+      - rvc-network
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # ========================================
+  # RVC Client - Lightweight streaming client
+  # ========================================
+  rvc-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    image: rvc-stream-client:latest
+    container_name: rvc-client
+    
+    # Audio device support (Linux)
+    # Uncomment for audio passthrough:
+    # devices:
+    #   - /dev/snd:/dev/snd
+    
+    volumes:
+      # Shared directory for models/indices
+      - ${RVC_SHARED_DIR:-./runtime/shared}:/app/shared:ro
+    
+    environment:
+      - RVC_SERVER_URL=ws://rvc-server:8080/rvc
+      - PYTHONUNBUFFERED=1
+    
+    networks:
+      - rvc-network
+    
+    depends_on:
+      rvc-server:
+        condition: service_healthy
+    
+    restart: "no"  # Client runs once then exits
+
+networks:
+  rvc-network:
+    driver: bridge
+
+volumes:
+  rvc-logs:
+  rvc-models:

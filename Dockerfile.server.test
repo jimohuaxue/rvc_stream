@@ -1,0 +1,30 @@
+# RVC Stream Client - Instant Test Image
+# Minimal Dockerfile for immediate testing
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+# Install ONLY core dependencies (no ffmpeg, no portaudio)
+RUN pip install --no-cache-dir \
+    fastapi==0.100.0 \
+    uvicorn[standard]==0.23.0 \
+    websockets==11.0 \
+    numpy==1.24.0 \
+    pyyaml==6.0
+
+# Copy application code
+COPY src/ ./src/
+COPY pyproject.toml ./
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Run server
+CMD ["python3", "-m", "src.rvc_server", "--host", "0.0.0.0", "--port", "8080"]

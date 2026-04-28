@@ -1,0 +1,4 @@
+# Core dependencies shared by client and server.
+numpy>=2.0.0
+pyyaml>=6.0
+websockets>=13.0
